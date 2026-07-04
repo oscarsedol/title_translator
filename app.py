@@ -42,40 +42,46 @@ else:
 # 비용 효율을 극대화한 가성비 최신 모델
 MODEL_NAME = 'gemini-3.1-flash-lite'
 
-# --- 번역 가능 언어 목록 ---
+# --- 번역 가능 언어 목록 (30개 언어) / 翻訳可能言語リスト ---
 LANGUAGES = {
-    "한국어 / 韓国語": "Korean", 
-    "일본어 / 日本語": "Japanese", 
+    "한국어 / 韓国語": "Korean",
     "영어 / 英語": "English",
-    "인도네시아어 / インドネシア語": "Indonesian", 
-    "대만어(번체) / 台湾語(繁体字)": "Traditional Chinese (Taiwan)",
+    "일본어 / 日本語": "Japanese",
     "중국어(간체) / 中国語(簡体字)": "Simplified Chinese",
-    "베트남어 / ベトナム語": "Vietnamese", 
-    "태국어 / タイ語": "Thai", 
-    "말레이시아어 / マレーシア語": "Malay",
-    "러시아어 / ロシア語": "Russian", 
-    "타갈로그어 / タガログ語": "Tagalog",
-    "스페인어 / スペイン語": "Spanish", 
-    "포르투갈어 / ポルトガル語": "Portuguese",
+    "중국어(대만) / 中国語(台湾)": "Traditional Chinese (Taiwan)",
+    "중국어(홍콩) / 中国語(香港)": "Traditional Chinese (Hong Kong)",
+    "스페인어 / スペイン語": "Spanish",
     "프랑스어 / フランス語": "French",
     "독일어 / ドイツ語": "German",
     "이탈리아어 / イタリア語": "Italian",
-    "우즈베크어 / ウズベク語": "Uzbek",
-    "카자흐어 / カザフ語": "Kazakh",
-    "튀르키예어 / トルコ語": "Turkish",
-    "힌디어 / ヒンディー語": "Hindi",
-    "아랍어 / アラビア語": "Arabic",
+    "포르투갈어 / ポルトガル語": "Portuguese",
+    "러시아어 / ロシア語": "Russian",
+    "우크라이나어 / ウクライナ語": "Ukrainian",
+    "폴란드어 / ポーランド語": "Polish",
+    "네덜란드어 / オランダ語": "Dutch",
     "스웨덴어 / スウェーデン語": "Swedish",
     "노르웨이어 / ノルウェー語": "Norwegian",
     "덴마크어 / デンマーク語": "Danish",
-    "핀란드어 / フィンランド語": "Finnish"
+    "핀란드어 / フィンランド語": "Finnish",
+    "아랍어 / アラビア語": "Arabic",
+    "페르시아어 / ペルシア語": "Persian",
+    "튀르키예어 / トルコ語": "Turkish",
+    "힌디어 / ヒンディー語": "Hindi",
+    "우즈베크어 / ウズベク語": "Uzbek",
+    "카자흐어 / カザフ語": "Kazakh",
+    "베트남어 / ベトナム語": "Vietnamese",
+    "태국어 / タイ語": "Thai",
+    "인도네시아어 / インドネシア語": "Indonesian",
+    "말레이어 / マレー語": "Malay",
+    "필리핀어 / フィリピン語": "Filipino"
 }
 
 # --- 스트림릿 세션 상태 초기화 ---
 for lang in LANGUAGES.keys():
     key = f"chk_{lang}"
     if key not in st.session_state:
-        st.session_state[key] = ("일본어 / 日本語" not in lang)
+        # 일본어만 기본으로 체크 해제
+        st.session_state[key] = ("일본어" not in lang)
 
 if 'is_processing' not in st.session_state:
     st.session_state.is_processing = False
@@ -189,6 +195,7 @@ with btn_col1:
 with btn_col2:
     st.button("전체 해제", on_click=deselect_all, use_container_width=True, disabled=is_locked)
 
+# 언어 개수가 많아졌으므로 4열 그리드로 배치
 cols = st.columns(4) 
 for i, lang in enumerate(LANGUAGES.keys()):
     with cols[i % 4]:
