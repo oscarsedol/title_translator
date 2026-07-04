@@ -42,38 +42,38 @@ else:
 # 비용 효율을 극대화한 가성비 최신 모델
 MODEL_NAME = 'gemini-3.1-flash-lite'
 
-# --- 번역 가능 언어 목록 (30개 언어) / 翻訳可能言語リスト ---
+# --- 번역 가능 언어 목록 (가나다순 30개 언어) / 翻訳可能言語リスト ---
 LANGUAGES = {
-    "한국어 / 韓国語": "Korean",
+    "네덜란드어 / オランダ語": "Dutch",
+    "노르웨이어 / ノルウェー語": "Norwegian",
+    "덴마크어 / デンマーク語": "Danish",
+    "독일어 / ドイツ語": "German",
+    "러시아어 / ロシア語": "Russian",
+    "말레이어 / マレー語": "Malay",
+    "베트남어 / ベトナム語": "Vietnamese",
+    "스웨덴어 / スウェーデン語": "Swedish",
+    "스페인어 / スペイン語": "Spanish",
+    "아랍어 / アラビア語": "Arabic",
     "영어 / 英語": "English",
+    "우즈베크어 / ウズベク語": "Uzbek",
+    "우크라이나어 / ウクライナ語": "Ukrainian",
+    "이탈리아어 / イタリア語": "Italian",
+    "인도네시아어 / インドネシア語": "Indonesian",
     "일본어 / 日本語": "Japanese",
     "중국어(간체) / 中国語(簡体字)": "Simplified Chinese",
     "중국어(대만) / 中国語(台湾)": "Traditional Chinese (Taiwan)",
     "중국어(홍콩) / 中国語(香港)": "Traditional Chinese (Hong Kong)",
-    "스페인어 / スペイン語": "Spanish",
-    "프랑스어 / フランス語": "French",
-    "독일어 / ドイツ語": "German",
-    "이탈리아어 / イタリア語": "Italian",
-    "포르투갈어 / ポルトガル語": "Portuguese",
-    "러시아어 / ロシア語": "Russian",
-    "우크라이나어 / ウクライナ語": "Ukrainian",
-    "폴란드어 / ポーランド語": "Polish",
-    "네덜란드어 / オランダ語": "Dutch",
-    "스웨덴어 / スウェーデン語": "Swedish",
-    "노르웨이어 / ノルウェー語": "Norwegian",
-    "덴마크어 / デンマーク語": "Danish",
-    "핀란드어 / フィンランド語": "Finnish",
-    "아랍어 / アラビア語": "Arabic",
-    "페르시아어 / ペルシア語": "Persian",
-    "튀르키예어 / トルコ語": "Turkish",
-    "힌디어 / ヒンディー語": "Hindi",
-    "우즈베크어 / ウズベク語": "Uzbek",
     "카자흐어 / カザフ語": "Kazakh",
-    "베트남어 / ベトナム語": "Vietnamese",
     "태국어 / タイ語": "Thai",
-    "인도네시아어 / インドネシア語": "Indonesian",
-    "말레이어 / マレー語": "Malay",
-    "필리핀어 / フィリピン語": "Filipino"
+    "튀르키예어 / トルコ語": "Turkish",
+    "페르시아어 / ペルシア語": "Persian",
+    "포르투갈어 / ポルトガル語": "Portuguese",
+    "폴란드어 / ポーランド語": "Polish",
+    "프랑스어 / フランス語": "French",
+    "핀란드어 / フィンランド語": "Finnish",
+    "필리핀어 / フィリピン語": "Filipino",
+    "한국어 / 韓国語": "Korean",
+    "힌디어 / ヒンディー語": "Hindi"
 }
 
 # --- 스트림릿 세션 상태 초기화 ---
@@ -101,18 +101,20 @@ def deselect_all():
 def translate_and_verify_metadata(orig_title, orig_desc, target_lang, progress_bar, status_text):
     model = genai.GenerativeModel(MODEL_NAME)
     
+    # 강력한 강제 번역 규칙 추가 (번역 회피 버그 픽스)
     prompt_base = f"""
     You are an expert YouTube SEO translator. Translate the following YouTube Title and Description to {target_lang}.
     CRITICAL RULES:
     1. Maintain the overall structure, tone, and formatting of the original.
     2. Keep ALL brackets, emojis, and special symbols (e.g., (), [], !, ?) exactly as they are used.
     3. The translated Title MUST be strictly under 100 characters (including spaces).
-    4. Output strictly in the following format without markdown blocks:
+    4. ABSOLUTELY DO NOT output the original text. You MUST translate the content entirely into {target_lang}. Copying the original language is strictly forbidden.
+    5. Output strictly in the following format without markdown blocks:
     [TITLE_START]
-    (Translated Title)
+    (Translated Title in {target_lang})
     [TITLE_END]
     [DESC_START]
-    (Translated Description)
+    (Translated Description in {target_lang})
     [DESC_END]
     
     Original Title:
