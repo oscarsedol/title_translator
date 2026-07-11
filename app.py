@@ -21,7 +21,6 @@ if not st.session_state.authenticated:
     st.subheader("이 앱은 허가된 사용자만 사용할 수 있습니다.")
     st.write("このアプリは許可されたユーザーのみ使用できます。")
     
-    # 1. 자동완성 지원을 위한 폼 로그인 구조 적용
     with st.form("login_form", clear_on_submit=False):
         login_user = st.text_input("Username / ID", key="login_user")
         login_pass = st.text_input("Password / パスワード", type="password", key="login_pass")
@@ -80,7 +79,6 @@ LANGUAGES = {
 for lang in LANGUAGES.keys():
     key = f"chk_{lang}"
     if key not in st.session_state:
-        # 2. 한국어만 기본으로 체크
         st.session_state[key] = ("한국어" in lang)
 
 if 'is_processing' not in st.session_state:
@@ -101,7 +99,7 @@ def deselect_all():
 def translate_and_verify_metadata(orig_title, orig_desc, target_lang, selected_model, progress_bar, status_text):
     model = genai.GenerativeModel(selected_model)
     
-    # 5. 원문 뉘앙스 유지 룰 (Rule 5) 추가
+    # "사용한 음원 라이선스 코드" 문구 번역 규칙 추가
     prompt_base = f"""
     You are an expert YouTube SEO translator. Translate the following YouTube Title and Description to {target_lang}.
     CRITICAL RULES:
@@ -110,13 +108,17 @@ def translate_and_verify_metadata(orig_title, orig_desc, target_lang, selected_m
     3. The translated Title MUST be strictly under 100 characters (including spaces).
     4. ABSOLUTELY DO NOT output the original text. You MUST translate the content entirely into {target_lang}. Copying the original language is strictly forbidden.
     5. Carefully preserve the original tone, nuance, style, and vibe of the speech (e.g., formal/informal politeness, slang, emotional expressions). Make it sound natural while respecting the original context.
-    6. Output strictly in the following format without markdown blocks:
+    6. Translate the phrase "사용한 음원 라이선스 코드" (which means 'Used Audio License Code') into {target_lang}.
+    7. Output strictly in the following format without markdown blocks:
     [TITLE_START]
     (Translated Title in {target_lang})
     [TITLE_END]
     [DESC_START]
     (Translated Description in {target_lang})
     [DESC_END]
+    [LABEL_START]
+    (Translated phrase for "사용한 음원 라이선스 코드" in {target_lang})
+    [LABEL_END]
     
     Original Title:
     {orig_title}
@@ -128,7 +130,7 @@ def translate_and_verify_metadata(orig_title, orig_desc, target_lang, selected_m
     attempt = 1
     while attempt <= 3:
         if not st.session_state.is_processing:
-            return None, None
+            return None, None, None
             
         status_text.text(f"[{target_lang}] 번역 및 100자 검증 중... ({attempt}/3)")
         progress_bar.progress(int(attempt * (100 / 3)))
@@ -140,10 +142,14 @@ def translate_and_verify_metadata(orig_title, orig_desc, target_lang, selected_m
             # 텍스트 파싱
             title_part = ""
             desc_part = ""
+            label_part = ""
+            
             if "[TITLE_START]" in text and "[TITLE_END]" in text:
                 title_part = text.split("[TITLE_START]")[1].split("[TITLE_END]")[0].strip()
             if "[DESC_START]" in text and "[DESC_END]" in text:
                 desc_part = text.split("[DESC_START]")[1].split("[DESC_END]")[0].strip()
+            if "[LABEL_START]" in text and "[LABEL_END]" in text:
+                label_part = text.split("[LABEL_START]")[1].split("[LABEL_END]")[0].strip()
                 
             # 100자 제한 검증
             if len(title_part) > 100:
@@ -161,7 +167,7 @@ def translate_and_verify_metadata(orig_title, orig_desc, target_lang, selected_m
             
             status_text.text(f"[{target_lang}] 완료! ({attempt}회 만에 성공)")
             progress_bar.progress(100)
-            return title_part, desc_part
+            return title_part, desc_part, label_part
 
         except Exception as e:
             status_text.text(f"[{target_lang}] 에러 발생: {e}")
@@ -170,7 +176,7 @@ def translate_and_verify_metadata(orig_title, orig_desc, target_lang, selected_m
             
     status_text.text(f"[{target_lang}] 3회 시도 실패. 건너뜁니다.")
     progress_bar.progress(100)
-    return None, None
+    return None, None, None
 
 # --- UI 레이아웃 구성 ---
 st.set_page_config(page_title="유튜브 제목/설명 번역기", page_icon="📝", layout="wide")
@@ -193,7 +199,7 @@ with col2:
 # 3. 음원 라이선스 코드 입력란
 st.markdown("---")
 st.subheader("🎵 음원 라이선스 코드 (선택)")
-orig_license = st.text_area("번역된 설명란 맨 하단에 그대로 덧붙일 라이선스 코드를 입력해줘. (인공지능이 건드리지 않음)", height=100, disabled=is_locked)
+orig_license = st.text_area("번역된 설명란 맨 하단에 '사용한 음원 라이선스 코드' 안내 문구와 함께 덧붙일 코드를 입력해줘.", height=100, disabled=is_locked)
 
 # 4. 제미나이 모델 선택 라디오 버튼
 st.markdown("---")
@@ -262,8 +268,8 @@ if st.session_state.is_processing and orig_title.strip() and orig_desc.strip():
         total_status_text.text(f"전체 진행 상황: {idx+1} / {total_langs} 언어 작업 중 ({clean_lang_name})")
         target_lang_en = LANGUAGES[lang]
         
-        # 모델 변수 추가 전달
-        t_title, t_desc = translate_and_verify_metadata(
+        # 모델 변수 및 라벨 반환값(t_label) 추가 
+        t_title, t_desc, t_label = translate_and_verify_metadata(
             orig_title, 
             orig_desc, 
             target_lang_en,
@@ -273,10 +279,12 @@ if st.session_state.is_processing and orig_title.strip() and orig_desc.strip():
         )
         
         if t_title and t_desc:
-            # 3. 원본 라이선스가 있다면 번역된 설명 뒤에 병합
+            # 3. 원본 라이선스가 있다면 번역된 설명 뒤에 띄어쓰기와 함께 병합
             final_desc = t_desc
             if orig_license.strip():
-                final_desc += f"\n\n{orig_license.strip()}"
+                # 인공지능이 라벨 번역을 놓쳤을 경우의 기본값 방어 코드
+                translated_label = t_label if t_label else "사용한 음원 라이선스 코드"
+                final_desc += f"\n\n{translated_label}\n{orig_license.strip()}"
                 
             st.session_state.results[lang] = {"title": t_title, "desc": final_desc}
             
