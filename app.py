@@ -4,32 +4,35 @@ import os
 import time
 from dotenv import load_dotenv
 
-# --- 환경변수 및 API 설정 / 環境変数 및 API 設定 ---
+# --- 환경변수 및 API 설정 ---
 load_dotenv()
 
 # 🔒 [보안 기능] Secrets에서 아이디/비밀번호 가져오기
 VALID_USERNAME = st.secrets.get("APP_USERNAME", os.getenv("APP_USERNAME", "owner"))
 VALID_PASSWORD = st.secrets.get("APP_PASSWORD", os.getenv("APP_PASSWORD", "password123"))
 
-# --- 로그인 UI 처리 / ログインUI処理 ---
+# --- 로그인 UI 처리 ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.set_page_config(page_title="🔒 로그인 / ログイン", page_icon="🔐", layout="centered")
-    st.title("🔐 시스템 접근 제한 / アクセス制限")
+    st.set_page_config(page_title="🔒 로그인", page_icon="🔐", layout="centered")
+    st.title("🔐 시스템 접근 제한")
     st.subheader("이 앱은 허가된 사용자만 사용할 수 있습니다.")
     st.write("このアプリは許可されたユーザーのみ使用できます。")
     
-    login_user = st.text_input("Username / ID", key="login_user")
-    login_pass = st.text_input("Password / パスワード", type="password", key="login_pass")
-    
-    if st.button("🔑 로그인 / ログイン", type="primary", use_container_width=True):
-        if login_user == VALID_USERNAME and login_pass == VALID_PASSWORD:
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("아이디 또는 비밀번호가 틀렸습니다. / IDまたはパスワードが間違っています。")
+    # 1. 자동완성 지원을 위한 폼 로그인 구조 적용
+    with st.form("login_form", clear_on_submit=False):
+        login_user = st.text_input("Username / ID", key="login_user")
+        login_pass = st.text_input("Password / パスワード", type="password", key="login_pass")
+        submit_login = st.form_submit_button("🔑 로그인 / ログイン", type="primary", use_container_width=True)
+        
+        if submit_login:
+            if login_user == VALID_USERNAME and login_pass == VALID_PASSWORD:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("아이디 또는 비밀번호가 틀렸습니다. / IDまたはパスワードが間違っています。")
     st.stop()
 
 # --- 로그인 성공 시 아래 본 프로그램 실행 ---
@@ -39,10 +42,7 @@ if api_key:
 else:
     st.error("앗, .env 파일이나 Secrets에 GEMINI_API_KEY가 없어. 확인해줘, 주인.")
 
-# 비용 효율을 극대화한 가성비 최신 모델
-MODEL_NAME = 'gemini-3.1-flash-lite'
-
-# --- 번역 가능 언어 목록 (가나다순 30개 언어) / 翻訳可能言語リスト ---
+# --- 번역 가능 언어 목록 (가나다순 30개 언어) ---
 LANGUAGES = {
     "네덜란드어 / オランダ語": "Dutch",
     "노르웨이어 / ノルウェー語": "Norwegian",
@@ -80,8 +80,8 @@ LANGUAGES = {
 for lang in LANGUAGES.keys():
     key = f"chk_{lang}"
     if key not in st.session_state:
-        # 일본어만 기본으로 체크 해제
-        st.session_state[key] = ("일본어" not in lang)
+        # 2. 한국어만 기본으로 체크
+        st.session_state[key] = ("한국어" in lang)
 
 if 'is_processing' not in st.session_state:
     st.session_state.is_processing = False
@@ -98,10 +98,10 @@ def deselect_all():
         st.session_state[f"chk_{lang}"] = False
 
 # --- 번역 및 100자 무결성 검증 함수 ---
-def translate_and_verify_metadata(orig_title, orig_desc, target_lang, progress_bar, status_text):
-    model = genai.GenerativeModel(MODEL_NAME)
+def translate_and_verify_metadata(orig_title, orig_desc, target_lang, selected_model, progress_bar, status_text):
+    model = genai.GenerativeModel(selected_model)
     
-    # 강력한 강제 번역 규칙 추가 (번역 회피 버그 픽스)
+    # 5. 원문 뉘앙스 유지 룰 (Rule 5) 추가
     prompt_base = f"""
     You are an expert YouTube SEO translator. Translate the following YouTube Title and Description to {target_lang}.
     CRITICAL RULES:
@@ -109,7 +109,8 @@ def translate_and_verify_metadata(orig_title, orig_desc, target_lang, progress_b
     2. Keep ALL brackets, emojis, and special symbols (e.g., (), [], !, ?) exactly as they are used.
     3. The translated Title MUST be strictly under 100 characters (including spaces).
     4. ABSOLUTELY DO NOT output the original text. You MUST translate the content entirely into {target_lang}. Copying the original language is strictly forbidden.
-    5. Output strictly in the following format without markdown blocks:
+    5. Carefully preserve the original tone, nuance, style, and vibe of the speech (e.g., formal/informal politeness, slang, emotional expressions). Make it sound natural while respecting the original context.
+    6. Output strictly in the following format without markdown blocks:
     [TITLE_START]
     (Translated Title in {target_lang})
     [TITLE_END]
@@ -189,6 +190,25 @@ with col2:
     st.subheader("원본 설명 (최대 5000자)")
     orig_desc = st.text_area("유튜브 설명을 입력하세요.", max_chars=5000, height=200, disabled=is_locked)
 
+# 3. 음원 라이선스 코드 입력란
+st.markdown("---")
+st.subheader("🎵 음원 라이선스 코드 (선택)")
+orig_license = st.text_area("번역된 설명란 맨 하단에 그대로 덧붙일 라이선스 코드를 입력해줘. (인공지능이 건드리지 않음)", height=100, disabled=is_locked)
+
+# 4. 제미나이 모델 선택 라디오 버튼
+st.markdown("---")
+MODEL_OPTIONS = {
+    "Gemini 3.5 Flash (한국어 번역시 추천)": "gemini-3.5-flash",
+    "Gemini 3.1 Flash-Lite (한국어 외 다국어 번역시 추천)": "gemini-3.1-flash-lite"
+}
+selected_model_label = st.radio(
+    "사용할 제미나이 모델을 선택해줘, 주인.",
+    options=list(MODEL_OPTIONS.keys()),
+    index=0,  # 기본 선택은 3.5 플래시
+    disabled=is_locked
+)
+selected_model = MODEL_OPTIONS[selected_model_label]
+
 st.markdown("---")
 st.subheader("🌐 번역할 언어 선택")
 btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 6])
@@ -242,16 +262,23 @@ if st.session_state.is_processing and orig_title.strip() and orig_desc.strip():
         total_status_text.text(f"전체 진행 상황: {idx+1} / {total_langs} 언어 작업 중 ({clean_lang_name})")
         target_lang_en = LANGUAGES[lang]
         
+        # 모델 변수 추가 전달
         t_title, t_desc = translate_and_verify_metadata(
             orig_title, 
             orig_desc, 
-            target_lang_en, 
+            target_lang_en,
+            selected_model,
             lang_progress_bar, 
             lang_status_text
         )
         
         if t_title and t_desc:
-            st.session_state.results[lang] = {"title": t_title, "desc": t_desc}
+            # 3. 원본 라이선스가 있다면 번역된 설명 뒤에 병합
+            final_desc = t_desc
+            if orig_license.strip():
+                final_desc += f"\n\n{orig_license.strip()}"
+                
+            st.session_state.results[lang] = {"title": t_title, "desc": final_desc}
             
         total_progress_bar.progress((idx + 1) / total_langs)
 
@@ -267,7 +294,6 @@ if st.session_state.results and not st.session_state.is_processing:
     for lang, data in st.session_state.results.items():
         with st.expander(f"📌 {lang} 번역 결과", expanded=True):
             st.markdown(f"**제목** (글자 수: {len(data['title'])}/100자)")
-            # st.code를 사용하면 우측 상단에 원클릭 복사 버튼이 자동으로 생성됩니다.
             st.code(data['title'], language="text")
             
             st.markdown("**설명**")
