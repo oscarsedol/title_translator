@@ -1,5 +1,6 @@
 import streamlit as st
-import google.generativeai as genai
+# 💡 최신 공식 통합 라이브러리로 변경 완료
+from google import genai
 import os
 import time
 from dotenv import load_dotenv
@@ -34,12 +35,18 @@ if not st.session_state.authenticated:
                 st.error("아이디 또는 비밀번호가 틀렸습니다. / IDまたはパスワードが間違っています。")
     st.stop()
 
-# --- 로그인 성공 시 아래 본 프로그램 실행 ---
+# --- 로그인 성공 시 아래 본 프로그램 실행 (제미나이 클라우드 세팅) ---
 api_key = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY")
 if api_key:
-    genai.configure(api_key=api_key)
+    try:
+        # 💡 핵심: vertexai=True 옵션으로 46만 원 클라우드 크레딧 사용!
+        client = genai.Client(api_key=api_key, vertexai=True)
+    except Exception as e:
+        st.error(f"🚨 제미나이 클라이언트 초기화 중 에러가 발생했어: {e}")
+        st.stop()
 else:
     st.error("앗, .env 파일이나 Secrets에 GEMINI_API_KEY가 없어. 확인해줘, 주인.")
+    st.stop()
 
 # --- 번역 가능 언어 목록 (가나다순 30개 언어) ---
 LANGUAGES = {
@@ -97,9 +104,6 @@ def deselect_all():
 
 # --- 번역 및 100자 무결성 검증 함수 ---
 def translate_and_verify_metadata(orig_title, orig_desc, target_lang, selected_model, progress_bar, status_text):
-    model = genai.GenerativeModel(selected_model)
-    
-    # "사용한 음원 라이선스 코드" 문구 번역 규칙 추가
     prompt_base = f"""
     You are an expert YouTube SEO translator. Translate the following YouTube Title and Description to {target_lang}.
     CRITICAL RULES:
@@ -136,7 +140,11 @@ def translate_and_verify_metadata(orig_title, orig_desc, target_lang, selected_m
         progress_bar.progress(int(attempt * (100 / 3)))
         
         try:
-            response = model.generate_content(prompt_base)
+            # 💡 최신 문법으로 수정 완료 (전역 client 객체 사용)
+            response = client.models.generate_content(
+                model=selected_model,
+                contents=prompt_base
+            )
             text = response.text.strip()
             
             # 텍스트 파싱
@@ -170,9 +178,16 @@ def translate_and_verify_metadata(orig_title, orig_desc, target_lang, selected_m
             return title_part, desc_part, label_part
 
         except Exception as e:
-            status_text.text(f"[{target_lang}] 에러 발생: {e}")
-            time.sleep(3)
-            attempt += 1
+            # 💡 에러 발생 시(Quota 등) 대기 로직 추가
+            if "429" in str(e) or "Quota" in str(e) or "exhausted" in str(e).lower():
+                status_text.text("⚠️ API 한도 도달! 25초 대기...")
+                time.sleep(25)
+                attempt += 1
+                continue
+            else:
+                status_text.text(f"[{target_lang}] 에러 발생: {e}")
+                time.sleep(3)
+                attempt += 1
             
     status_text.text(f"[{target_lang}] 3회 시도 실패. 건너뜁니다.")
     progress_bar.progress(100)
@@ -210,7 +225,7 @@ MODEL_OPTIONS = {
 selected_model_label = st.radio(
     "사용할 제미나이 모델을 선택해줘, 주인.",
     options=list(MODEL_OPTIONS.keys()),
-    index=0,  # 기본 선택은 3.5 플래시
+    index=0,  
     disabled=is_locked
 )
 selected_model = MODEL_OPTIONS[selected_model_label]
@@ -268,7 +283,6 @@ if st.session_state.is_processing and orig_title.strip() and orig_desc.strip():
         total_status_text.text(f"전체 진행 상황: {idx+1} / {total_langs} 언어 작업 중 ({clean_lang_name})")
         target_lang_en = LANGUAGES[lang]
         
-        # 모델 변수 및 라벨 반환값(t_label) 추가 
         t_title, t_desc, t_label = translate_and_verify_metadata(
             orig_title, 
             orig_desc, 
@@ -279,7 +293,7 @@ if st.session_state.is_processing and orig_title.strip() and orig_desc.strip():
         )
         
         if t_title and t_desc:
-            # 3. 원본 라이선스가 있다면 번역된 설명 뒤에 띄어쓰기와 함께 병합
+            # 원본 라이선스가 있다면 번역된 설명 뒤에 띄어쓰기와 함께 병합
             final_desc = t_desc
             if orig_license.strip():
                 # 인공지능이 라벨 번역을 놓쳤을 경우의 기본값 방어 코드
