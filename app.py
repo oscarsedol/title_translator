@@ -219,8 +219,8 @@ orig_license = st.text_area("번역된 설명란 맨 하단에 '사용한 음원
 # 4. 제미나이 모델 선택 라디오 버튼
 st.markdown("---")
 MODEL_OPTIONS = {
-    "Gemini 3.5 Flash (한국어 번역시 추천)": "gemini-3.5-flash",
-    "Gemini 3.1 Flash-Lite (한국어 외 다국어 번역시 추천)": "gemini-3.1-flash-lite"
+    "Gemini Flash latest model (한국어 번역시 추천)": "gemini-flash-latest",
+    "Gemini Flash-Lite latest model (한국어 외 다국어 번역시 추천)": "gemini-flash-lite-latest"
 }
 selected_model_label = st.radio(
     "사용할 제미나이 모델을 선택해줘, 주인.",
